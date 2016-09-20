@@ -4,17 +4,17 @@
 #define _MOTORCONTROL_h
 
 #if defined(ARDUINO) && ARDUINO >= 100
-	#include "arduino.h"
+#include "arduino.h"
 #else
-	#include "WProgram.h"
+#include "WProgram.h"
 #endif
 
 class MotorControlClass
 {
- protected:
+protected:
 
 
- public:
+public:
 	void init();
 	void motor(int m, int pwm);
 	void Forward(int distance);

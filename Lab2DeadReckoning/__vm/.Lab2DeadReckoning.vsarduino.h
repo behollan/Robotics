@@ -51,5 +51,9 @@ extern "C" void __cxa_pure_virtual() {;}
 #define F(string_literal) ((const PROGMEM char *)(string_literal))
 #undef PSTR
 #define PSTR(string_literal) ((const PROGMEM char *)(string_literal))")
-#include "DeadReckoning.ino"
+ #include <VM_DBG.h>
+
+//
+//
+#include "Lab2DeadReckoning.ino"
 #endif
