@@ -17,10 +17,9 @@
 
 void MotorControlClass::motor(String m, int pwm) {
 
-	Serial.print("entering motor ");
-	Serial.print(m);
-	Serial.print("\t");
-	Serial.println(pwm);
+	Serial.print(pwm);
+	Serial.print(",");
+
 
 	if (m == "LEFT") {
 
@@ -48,7 +47,7 @@ void MotorControlClass::motor(String m, int pwm) {
 		else {
 			analogWrite(pwmRight, 0);
 		}
-	}// end motor B
+	}// end Right motor
 }
 
 void MotorControlClass::Forward(float speed) {
@@ -93,8 +92,8 @@ void MotorControlClass::ForwardStop() {
 	motor("LEFT", 0);
 	motor("RIGHT", 0);
 
-	motor("LEFT", -motorLeftSpeed*0.9);
-	motor("RIGHT", -motorRightSpeed);
+	motor("LEFT", -150);
+	motor("RIGHT", -150);
 
 	delay(BackDrive);
 
@@ -106,8 +105,8 @@ void MotorControlClass::LeftStop() {
 	motor("LEFT", 0);
 	motor("RIGHT", 0);
 
-	motor("LEFT", motorLeftTurn*0.9);
-	motor("RIGHT", -motorRightTurn);
+	motor("LEFT", 150);
+	motor("RIGHT", -150);
 
 	delay(BackDrive);
 
@@ -119,8 +118,8 @@ void MotorControlClass::RightStop() {
 	motor("LEFT", 0);
 	motor("RIGHT", 0);
 
-	motor("LEFT", -motorLeftTurn*0.9);
-	motor("RIGHT", motorRightTurn);
+	motor("LEFT", -150);
+	motor("RIGHT", 150);
 
 	delay(BackDrive);
 

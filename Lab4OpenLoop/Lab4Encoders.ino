@@ -1,174 +1,183 @@
 #include "PinChangeInt.h"
 #include "MotorControl.h"
 
+/*		Pin Definitions			*/	
+// Encoder
+#define EncoderMotorLeft		7
+#define EncoderMotorRight		8
+// Bumpers
+#define LeftBumpPin				4
+#define RightBumpPin			5
+#define startPin				9
 
-// Encoder pin definitions and variables
-#define  EncoderMotorLeft		8
-#define  EncoderMotorRight		7
-#define  GAINleftMotor			20
-#define  GAINrightMotor			20
-#define  LEFTmotor				1
-#define  RIGHTmotor				2
+//Motor Shield
+#define	motorRightPWM			3
+#define motorRightDirection		12
+#define motorLeftPWM			11
+#define motorLeftDirection		13
 
-//Motor Shield Pin Definitions
-#define  motorRightPWM			3
-#define  motorRightDirection	12
-#define  motorLeftPWM			11
-#define  motorLeftDirection		13
+/*		Calibration values		*/
+#define	GAINleftMotor			1
+#define	GAINrightMotor			1
+#define	GainAdjust				1
 
-#define GainAdjust		1
-
-
-///////////////////////////////////
+/*		Variable inits			*/
 volatile unsigned int leftEncoderCount = 0;
 volatile unsigned int rightEncoderCount = 0;
+int countsDesired, countsCompleted, CMDleft, CMDright, errorLeft, errorRight, countLeft, countRight;
+int inittime = millis();
+int rate = 50;
+int correctedPWMLeft = 190;
+int nodesToMM = 30;
 
 void setup() {
-	// set stuff up
-	Serial.begin(9600);
-	pinMode(EncoderMotorLeft, INPUT_PULLUP);     //set the pin to input
-	attachPinChangeInterrupt(EncoderMotorLeft, indexLeftEncoderCount, FALLING);
+	pinMode(startPin, INPUT_PULLUP);
 
-	pinMode(EncoderMotorRight, INPUT_PULLUP);     //set the pin to input
-	attachPinChangeInterrupt(EncoderMotorRight, indexRightEncoderCount, FALLING);
+	Serial.begin(115200);
+	pinMode(EncoderMotorLeft, INPUT_PULLUP);     //set the pin to input pullup
+	attachPinChangeInterrupt(EncoderMotorLeft, indexLeftEncoderCount, CHANGE);
+
+	pinMode(EncoderMotorRight, INPUT_PULLUP);     //set the pin to input pullup
+	attachPinChangeInterrupt(EncoderMotorRight, indexRightEncoderCount, CHANGE);
 }
 
+String directions[]=
+{
+	"F","R","F","R","F","L","F","R","F","R","F","L","F","R","F","R","F","L","F","L","F","L","F","L","F","R","F"
+};
+int vals[]=
+{
+	1,90,2,90,1,90,2,90,1,90,2,90,1,90,1,90,1,90,1,90,2,90,3,90,1,90,1
+};
 void loop()
 {
-	forward(30);
-	MC.ForwardStop();
-	delay(1000);
-	left(90);
-	MC.LeftStop();
-	delay(1000);
-	right(90);
-	MC.RightStop();
-	exit(0);
-
+	while (digitalRead(startPin) == 0) {
+		int i = 0;
+		while (i < 26) {
+			move(directions[i], vals[i]);
+			if (directions[i] == "F") {
+				MC.ForwardStop();
+			}
+			else if (directions[i] == "L") {
+				MC.LeftStop();
+			}
+			else if (directions[i] == "R") {
+				MC.RightStop();
+			}
+			i++;
+			delay(1000);
+		}
+	}
 }
 
-void forward(float distance)
-{
-	int countsDesired, countsCompleted, CMDleft, CMDright, errorLeft, errorRight;
-	int countLeft = 0;
-	int countRight = 0;
-	
-	countsDesired = distance*6/(3.14*8);
+void move(String dir, int val){ //input val is cm for forward travel and degrees for L/R
+	countLeft = 0;
+	countRight = 0;
+
+	if (dir == "F") {
+		countsDesired = nodesToMM*val * 36 / (3.14 * 8.25); //12 steps per rev, D = 8.25 cm
+	}
+	else if (dir == "L" || dir == "R") {
+		countsDesired = (7.5/41.25*val)-1; //12 steps per rev r_chasis=7.5cm, r_wheel=4.125cm
+	}
 	leftEncoderCount = 0;
 	rightEncoderCount = 0;
-	// we make the errors non-zero so our first test gets us into the loop
+
 	errorLeft = countsDesired - leftEncoderCount;
 	errorRight = countsDesired - rightEncoderCount;
-	while (errorLeft || errorRight)
+
+	while (errorLeft > 0 || errorRight > 0)
 	{
-		CMDleft = computeCommand(GAINleftMotor, errorLeft);
-		CMDright = computeCommand(GAINrightMotor, errorRight);
-		if (errorLeft - errorRight > 2) {
-			CMDleft = GainAdjust*CMDleft;
+		correctedPWMLeft = computeCorrection();
+		CMDleft = computeCommand("L", errorLeft, correctedPWMLeft);
+		CMDright = computeCommand("R", errorRight, 128);
+
+
+		if (dir == "F") {
+			MC.motor("LEFT", CMDleft);
+			MC.motor("RIGHT", CMDright);
 		}
-		else if (errorLeft-errorRight<-2){
-			CMDright = GainAdjust*CMDright;
+		else if (dir == "L") {
+			MC.motor("LEFT", -CMDleft);
+			MC.motor("RIGHT", CMDright);
 		}
-		Serial.print("Left Error: ");
-		Serial.println(errorLeft);
-		Serial.print("Right Error: ");
+		else if (dir == "R") {
+			MC.motor("LEFT", CMDleft);
+			MC.motor("RIGHT", -CMDright);
+		}
+
+		Serial.print(errorLeft);
+		Serial.print(",");
 		Serial.println(errorRight);
 
-		MC.motor("LEFT", CMDleft);
-		MC.motor("RIGHT", CMDright);
 		countLeft = leftEncoderCount;
 		countRight = rightEncoderCount;
 		errorLeft = countsDesired - countLeft;
 		errorRight = countsDesired - countRight;
 	}
 
+		CMDleft = 175;
+		correctedPWMLeft = 175;
 }
-void left(float angle) {
-	int countsDesired, countsCompleted, CMDleft, CMDright, errorLeft, errorRight;
-	int countLeft = 0;
-	int countRight = 0;
 
-	countsDesired = angle/360*2*7.5*6/8;
-	leftEncoderCount = 0;
-	rightEncoderCount = 0;
-	// we make the errors non-zero so our first test gets us into the loop
-	errorLeft = countsDesired - leftEncoderCount;
-	errorRight = countsDesired - rightEncoderCount;
-	while (errorLeft || errorRight)
-	{
-		CMDleft = computeCommand(GAINleftMotor, errorLeft);
-		CMDright = computeCommand(GAINrightMotor, errorRight);
-		if (errorLeft - errorRight < 2) {
-			CMDleft = GainAdjust*CMDleft;
-		}
-		else if (errorLeft - errorRight<-2) {
-			CMDright = GainAdjust*CMDright;
-		}
-		MC.motor("LEFT", -CMDleft);
-		MC.motor("RIGHT", CMDright);
-		countLeft = leftEncoderCount;
-		countRight = rightEncoderCount;
-		errorLeft = countsDesired - countLeft;
-		errorRight = countsDesired - countRight;
+int computeCorrection() {
+	int relError = errorLeft - errorRight;
+	int timer = millis()-inittime;
+	if (abs(relError) > 1 && timer > rate) {
+		correctedPWMLeft = correctedPWMLeft + 1000 * relError / timer;
+		/*Serial.print("Timer: ");
+		Serial.println(timer);*/
+		inittime = millis();
 	}
-
-}
-void right(float angle) {
-	int countsDesired, countsCompleted, CMDleft, CMDright, errorLeft, errorRight;
-	int countLeft = 0;
-	int countRight = 0;
-
-	countsDesired = angle / 360 * 2 * 7.5 * 6 / 8;
-	leftEncoderCount = 0;
-	rightEncoderCount = 0;
-	errorLeft = countsDesired - leftEncoderCount;
-	errorRight = countsDesired - rightEncoderCount;
-	while (errorLeft || errorRight)
-	{
-		CMDleft = computeCommand(GAINleftMotor, errorLeft);
-		CMDright = computeCommand(GAINrightMotor, errorRight);
-		if (errorLeft - errorRight < 2) {
-			CMDleft = GainAdjust*CMDleft;
-		}
-		else if (errorLeft - errorRight<-2) {
-			CMDright = GainAdjust*CMDright;
-		}
-		Serial.print("Left motor error: ");
-		Serial.println(errorLeft);
-		Serial.print("RIGHT motor error: ");
-		Serial.println(errorRight);
-		MC.motor("LEFT", CMDleft);
-		MC.motor("RIGHT", -CMDright);
-		countLeft = leftEncoderCount;
-		countRight = rightEncoderCount;
-		errorLeft = countsDesired - countLeft;
-		errorRight = countsDesired - countRight;
+	if (correctedPWMLeft > 255) {
+		correctedPWMLeft = 255;
 	}
-
+	else if (correctedPWMLeft < 0) {
+		correctedPWMLeft = 0;
+	}
+	return correctedPWMLeft;
 }
 
-int computeCommand(int gain, int error)
+int computeCommand(String dir, int error, int PWM)
 {
-		int cmdDir = 0;
-		cmdDir = (gain * error);
-		if (cmdDir  > 255)
-			cmdDir = 255;
-		else if (-128 < cmdDir < 128) {
-			cmdDir = 0;
+	int cmdPWM;
+	if (error > 5) {
+		cmdPWM = PWM;
+	}
+	else if (error <= 5) {
+		if (dir == "L") {
+			cmdPWM = PWM*GAINleftMotor;
 		}
-		else if (cmdDir < -255) {
-			cmdDir = -255;
+		else if (dir == "R") {
+			cmdPWM = PWM*GAINrightMotor;
 		}
-		return(cmdDir);
-	
+	}
+	else {
+
+	}
+	if (cmdPWM > 255) {
+		cmdPWM = 255;
+	}
+	else if (cmdPWM < -255) {
+		cmdPWM = -255;
+	}
+	else if (cmdPWM > 0) {
+		cmdPWM = map(cmdPWM, 0, 255, 100, 255);
+	}
+	else if (cmdPWM < 0) {
+		cmdPWM = map(cmdPWM, -255, 0, -255, -100);
+	}
+	else {
+		cmdPWM = PWM;
+	}
+	return cmdPWM;
 }
 
-
+/*Interupt Service Routines*/
 void indexLeftEncoderCount()
 {
 	leftEncoderCount++;
 }
-//////////////////////////////////////////////////////////
 void indexRightEncoderCount()
 {
 	rightEncoderCount++;
