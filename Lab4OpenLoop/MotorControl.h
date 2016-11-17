@@ -13,6 +13,7 @@ class MotorControlClass
 {
 protected:
 
+	void correction();
 
 public:
 	void Forward(float speed);
@@ -29,4 +30,9 @@ public:
 
 extern MotorControlClass MC;
 
+extern volatile unsigned int leftEncoderCount, rightEncoderCount;
+extern int countsDesired, countsCompleted, CMDleft, CMDright, errorLeft;
+extern int errorRight, countLeft, countRight, inittime, rate, correctedPWMLeft, nodesToMM;
+
+extern int LSenseVal, FSenseVal, LTol, FTol, wallDist, correctionAngle;
 #endif
