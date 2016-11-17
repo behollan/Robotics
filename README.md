@@ -3,7 +3,7 @@ This repository serves as documentation of all the code run by Ben Holland and K
 
 ## Authors
 
-[Ben Holland](behollan@mines.edu)|[Kyle Crews](kcrews@mines.edu)
+[Ben Holland](mailto:behollan@mines.edu)|[Kyle Crews](mailto:kcrews@mines.edu)
 ---|---
 Senior, Engineering Physics|Senior, Mechanical Engineering
 
